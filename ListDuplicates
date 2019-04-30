@@ -1,0 +1,59 @@
+using Microsoft.SharePoint.Client;
+using Microsoft.SharePoint.Client.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+
+namespace CheckDuplicatesInList
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            string userName = "xxx";
+            string password = "xxx";
+            var securePassword = new SecureString();
+            foreach (char c in password)
+            {
+                securePassword.AppendChar(c);
+            }
+            using (var clientContext = new ClientContext("https://xxx.sharepoint.com/sites/xxx"))
+            {
+                clientContext.Credentials = new SharePointOnlineCredentials(userName, securePassword);
+                Web web = clientContext.Web;
+                clientContext.Load(web, a => a.ServerRelativeUrl);
+                clientContext.ExecuteQuery();
+                List list = clientContext.Web.Lists.GetByTitle("Employee");
+                CamlQuery caml = new CamlQuery();
+                caml.ViewXml = "< View >< Query > " +
+                    "  <Where>" +
+                    "    <And>" +
+                    "      <Geq>" +
+                    "        <FieldRef Name='Created' />" +
+                    "          <Value IncludeTimeValue='True' Type='DateTime'>2017-01-01T00:00:00Z</Value>" +
+                    "      </Geq>" +
+                    "      <Leq>" +
+                    "        <FieldRef Name='Created' />" +
+                    "        <Value IncludeTimeValue='True' Type='DateTime'>2020-12-31T23:59:00Z</Value>" +
+                    "      </Leq>" +
+                    "    </And>" +
+                    "  </Where>" +
+                    "</Query></View>";
+                ListItemCollection items = list.GetItems(caml);
+                clientContext.Load(items);
+                clientContext.ExecuteQuery();
+                var testitems = items.Cast<ListItem>().Select(s => new { EmpID = s["EmployeeID"].ToString() });
+                var duplicates = testitems.GroupBy(i => i.EmpID).Where(g => g.Count() > 1);
+                foreach (var d in duplicates)
+                {
+                    Console.WriteLine(d.Key);
+                    Console.ReadLine();
+                }
+            }
+        }
+    }
+}
